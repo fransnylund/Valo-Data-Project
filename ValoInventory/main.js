@@ -3,6 +3,7 @@ const categories = new Set();       // A Set for holding the categories in the i
 const locations = new Set();        // A Set for holding the locations in the inventory data.
 let sorting = "date";               // A string to determine the sorting variable.
 let ascending = false;              // A boolean to determine how to sort.
+let lang = 0;                       // A variable for switching language. 0 is English, 1 is Finnish.
 
 /*
     Adds event listeners to all the buttons and input elements on the main page.
@@ -18,6 +19,8 @@ function main() {
     document.getElementById("textsearch").addEventListener("change", printData);
     document.getElementById("categorysearch").addEventListener("change", printData);
     document.getElementById("locationsearch").addEventListener("change", printData);
+    document.getElementById("fin").addEventListener("click", changeLang);
+    document.getElementById("eng").addEventListener("click", changeLang);
     document.getElementById("textsearch").addEventListener("keypress", (e)=>{
         if (e.key === "Enter") {
             printData();
@@ -36,24 +39,25 @@ function main() {
 */
 async function submit() {
 	if (validate()) {
-        let newstuff = false;
+        let newCategory = false;
+        let newLocation  = false;
 		const date = new Date();
         let item = document.getElementById("description").value;
         let quantity = document.getElementById("quantity").value;
         let category = document.getElementById("category").value;
         if (category == "new") {
             category = document.getElementById("newcategory").value;
-            newstuff = true;
+            newCategory = true;
         }
         let location = document.getElementById("location").value;
         if (location == "new") {
             location = document.getElementById("newlocation").value;
-            newstuff = true;
+            newLocation = true;
         }
         try {
             saveData(date.toDateString(), item, quantity, category, location);
-            if (newstuff) {
-                fetchAll(false);
+            if (newCategory || newLocation) {
+                fetchAll(false, newCategory, newLocation);
             }
             reset(false);
         } catch (e) {
@@ -64,49 +68,55 @@ async function submit() {
 
 /*
     Loads the inventory data into the allData array.
-    Also updates the categories and locations Sets and
-    the respective drop-down boxes.
+    Also updates the categories and locations Sets.
     If the parameter print is set to true,
     calls the functions for sorting and printing the inventory data.
+    If the newCat and newLoc parameters are set to true,
+    updates the respective drop-down boxes.
 */
-async function fetchAll(print = true) {
+async function fetchAll(print = true, newCat = true, newLoc = true) {
     try {
         const data = await getData()
         allData.length = 0;
         for (let i = 0; i < data.length; i++) {
             allData.push(data[i]);
             categories.add(data[i][3]);
-            locations.add(data[i][4]);
+            locations.add(data[i][4].trim());
         }
-        let select1 = document.getElementById("category");
-        let select2 = document.getElementById("categorysearch");
-        while (select1.childElementCount > 2) {
-            select1.removeChild(select1.children[1])
+        let select1, select2;
+        if (newCat) {
+            select1 = document.getElementById("category");
+            select2 = document.getElementById("categorysearch");
+            while (select1.childElementCount > 2) {
+                select1.removeChild(select1.children[1])
+            }
+            while (select2.childElementCount > 1) {
+                select2.removeChild(select2.children[1])
+            }
+            for (const x of categories) {
+                let newOption = document.createElement("OPTION");
+                newOption.setAttribute("value", x);
+                newOption.innerText = x;
+                select1.children[0].after(newOption);
+                select2.children[0].after(newOption.cloneNode(true));
+            }
         }
-        while (select2.childElementCount > 1) {
-            select2.removeChild(select2.children[1])
-        }
-        for (const x of categories) {
-            let newOption = document.createElement("OPTION");
-            newOption.setAttribute("value", x);
-            newOption.innerText = x;
-            select1.children[0].after(newOption);
-            select2.children[0].after(newOption.cloneNode(true));
-        }
-        select1 = document.getElementById("location");
-        select2 = document.getElementById("locationsearch");
-        while (select1.childElementCount > 2) {
-            select1.removeChild(select1.children[1])
-        }
-        while (select2.childElementCount > 1) {
-            select2.removeChild(select2.children[1])
-        }
-        for (const x of locations) {
-            let newOption = document.createElement("OPTION");
-            newOption.setAttribute("value", x);
-            newOption.innerText = x;
-            select1.children[0].after(newOption);
-            select2.children[0].after(newOption.cloneNode(true));
+        if (newLoc) {
+            select1 = document.getElementById("location");
+            select2 = document.getElementById("locationsearch");
+            while (select1.childElementCount > 2) {
+                select1.removeChild(select1.children[1])
+            }
+            while (select2.childElementCount > 1) {
+                select2.removeChild(select2.children[1])
+            }
+            for (const x of locations) {
+                let newOption = document.createElement("OPTION");
+                newOption.setAttribute("value", x);
+                newOption.innerText = x;
+                select1.children[0].after(newOption);
+                select2.children[0].after(newOption.cloneNode(true));
+            }
         }
         if (print) {
             sortData();
@@ -118,7 +128,8 @@ async function fetchAll(print = true) {
 }
 
 /*
-    Displays the inventory data in a table form
+    Displays the inventory data in a table form.
+    Missing the id info for deleting.
 */
 function printData() {
     let table = document.getElementById("data");
@@ -138,6 +149,9 @@ function printData() {
         category.innerText = allData[i][3];
         location.innerText = allData[i][4];
         time.innerText = allData[i][0];
+        del.innerHTML = '<img src="/svg/trashcan.svg" alt="Delete item" width="20" height="25">';
+        del.children[0].setAttribute("id", i);      // Get the actual id of the item instead of this.
+        del.children[0].addEventListener("click", deleteItem);
         row.append(item, quantity, category, location, time, del);
         let itemMatch = true;
         let categoryMatch = true;
@@ -169,13 +183,24 @@ function printData() {
 }
 
 /*
+    A function to be called when the user wants to delete an item.
+    A work in progress.
+    Currently only deletes the item from the table, not the database.
+*/
+function deleteItem(e) {
+    let td = e.target;
+    td.parentElement.parentElement.remove();
+    testi("Removed item " + td.getAttribute("id"));
+}
+
+/*
     Switches the UI to display the browsing mode.
     Clears the search panel.
 */
 function browseMode() {
     error("");
     document.getElementById("add-div").style.display = "none";
-    document.getElementById("add-button").style.display = "block";
+    document.getElementById("add-button").style.display = "inline-block";
     document.getElementById("browse-div").style.display = "block";
     document.getElementById("browse-button").style.display = "none";
     document.getElementById("textsearch").value = "";
@@ -194,7 +219,7 @@ function addMode() {
     document.getElementById("add-div").style.display = "block";
     document.getElementById("add-button").style.display = "none";
     document.getElementById("browse-div").style.display = "none";
-    document.getElementById("browse-button").style.display = "block";
+    document.getElementById("browse-button").style.display = "inline-block";
 }
 
 /*
@@ -222,27 +247,33 @@ function validate() {
     error("");
     let valid = true;
     if (document.getElementById("description").value == "") {
-        error("Please enter item description<br>", true);
+        const x = ["Please enter item description<br>", "Syötä tuotteen kuvaus<br>"];
+        error(x[lang], true);
         valid = false;
     }
     if (Number(document.getElementById("quantity").value) <= 0) {
-        error("Please enter a positive quantity<br>", true);
+        const x = ["Please enter a positive quantity<br>", "Syötä positiivinen lukumäärä<br>"];
+        error(x[lang], true);
         valid = false;
     }
     if (document.getElementById("category").value == "none") {
-        error("Please select a category<br>", true);
+        const x = ["Please select a category<br>", "Valitse kategoria<br>"];
+        error(x[lang], true);
         valid = false;
     } else if (document.getElementById("category").value == "new" &&
             document.getElementById("newcategory").value == "") {
-        error("Please enter a category<br>", true);
+        const x = ["Please enter a category<br>", "Syötä kategoria<br>"];
+        error(x[lang], true);
         valid = false;
     }
     if (document.getElementById("location").value == "none") {
-        error("Please select a location<br>", true);
+        const x = ["Please select a location<br>", "Valitse sijainti<br>"];
+        error(x[lang], true);
         valid = false;
     } else if (document.getElementById("location").value == "new" &&
             document.getElementById("newlocation").value == "") {
-        error("Please enter a location<br>", true);
+        const x = ["Please enter a location<br>", "Syötä sijainti<br>"];
+        error(x[lang], true);
         valid = false;
 }
     return valid;
@@ -256,6 +287,7 @@ function validate() {
 function categoryChange() {
     if (document.getElementById("category").value == "new") {
         document.getElementById("newcategory").style.display = "block";
+        document.getElementById("newcategory").focus();
     } else {
         document.getElementById("newcategory").value = "";
         document.getElementById("newcategory").style.display = "none";
@@ -269,6 +301,7 @@ function categoryChange() {
 function locationChange() {
     if (document.getElementById("location").value == "new") {
         document.getElementById("newlocation").style.display = "block";
+        document.getElementById("newlocation").focus();
     } else {
         document.getElementById("newlocation").value = "";
         document.getElementById("newlocation").style.display = "none";
@@ -405,6 +438,77 @@ function sortByDate(a, b) {
             return (date1 > date2) ? -1 : 1;
         }
     }
+}
+
+/*
+    Changes the language of the UI.
+    Note that changes in the html file will mess this up.
+*/
+function changeLang(e) {
+    if (e.target.getAttribute("id") == "eng") {
+        document.getElementById("eng").style.display = "none"
+        document.getElementById("fin").style.display = "inline-block"
+        lang = 0;
+        document.getElementsByTagName("title")[0].innerText = "Valo Inventory";
+        document.getElementsByTagName("h1")[0].innerText = "Valo Inventory";
+        document.getElementById("browse-button").innerText = "Click to browse";
+        document.getElementById("add-button").innerText = "Click to add";
+        document.getElementsByTagName("legend")[0].innerText = "Add a new item";
+        let labels = document.getElementsByTagName("label");
+        labels[0].innerText = "Item description:";
+        labels[1].innerText = "Quantity:";
+        labels[2].innerText = "Category:";
+        labels[3].innerText = "Location:";
+        labels[4].innerText = "Search for item:";
+        let cats = document.getElementById("category");
+        cats.children[0].innerText = "Select a category";
+        cats.children[cats.children.length - 1].innerText = "A new category:";
+        let locs = document.getElementById("location");
+        locs.children[0].innerText = "Select a location";
+        locs.children[locs.children.length - 1].innerText = "A new location:";
+        document.getElementById("submit-button").innerText = "Submit";
+        document.getElementById("reset-button").innerText = "Reset";
+        document.getElementById("categorysearch").children[0].innerText = "All categories";
+        document.getElementById("locationsearch").children[0].innerText = "All locations";
+        let heads = document.getElementsByTagName("th");
+        heads[0].innerText = "Item";
+        heads[1].innerText = "Quantity";
+        heads[2].innerText = "Category";
+        heads[3].innerText = "Location";
+        heads[4].innerText = "Time";
+    } else if (e.target.getAttribute("id") == "fin") {
+        document.getElementById("fin").style.display = "none"
+        document.getElementById("eng").style.display = "inline-block"
+        lang = 1;
+        document.getElementsByTagName("title")[0].innerText = "Valo Inventaario";
+        document.getElementsByTagName("h1")[0].innerText = "Valo Inventaario";
+        document.getElementById("browse-button").innerText = "Paina selataksesi";
+        document.getElementById("add-button").innerText = "Paina lisätäksesi";
+        document.getElementsByTagName("legend")[0].innerText = "Lisää uusi tuote";
+        let labels = document.getElementsByTagName("label");
+        labels[0].innerText = "Tuotteen kuvaus:";
+        labels[1].innerText = "Määrä:";
+        labels[2].innerText = "Kategoria:";
+        labels[3].innerText = "Sijainti:";
+        labels[4].innerText = "Etsi tuotetta:";
+        let cats = document.getElementById("category");
+        cats.children[0].innerText = "Valitse kategoria";
+        cats.children[cats.children.length - 1].innerText = "Uusi kategoria:";
+        let locs = document.getElementById("location");
+        locs.children[0].innerText = "Valitse sijainti";
+        locs.children[locs.children.length - 1].innerText = "Uusi sijainti:";
+        document.getElementById("submit-button").innerText = "Valmis";
+        document.getElementById("reset-button").innerText = "Tyhjennä";
+        document.getElementById("categorysearch").children[0].innerText = "Kaikki kategoriat";
+        document.getElementById("locationsearch").children[0].innerText = "Kaikki sijainnit";
+        let heads = document.getElementsByTagName("th");
+        heads[0].innerText = "Tuote";
+        heads[1].innerText = "Määrä";
+        heads[2].innerText = "Kategoria";
+        heads[3].innerText = "Sijainti";
+        heads[4].innerText = "Aika";
+    }
+
 }
 
 /*

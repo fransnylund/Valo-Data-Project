@@ -7,3 +7,5 @@ Mon Sep 15 2025,Testi,10,Olennaiset,Hylly
 Mon Sep 15 2025,abc,13,Olennaiset,Hylly
 Mon Sep 15 2025,yolo,77,cat2,Hylly
 Tue Sep 16 2025,Tiistaitesti,2,Olennaiset,Hylly
+Wed Sep 17 2025,The Thing,1,TBD,Hylly
+Wed Sep 17 2025,Kuukkelin munat,2,Olennaiset,Luola

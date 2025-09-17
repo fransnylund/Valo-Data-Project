@@ -54,3 +54,7 @@ h1 {
 html {
     font-family: Verdana;
 }
+
+#eng {
+    display: none;
+}
